@@ -1,0 +1,67 @@
+<!DOCTYPE html>  
+<html lang="en">  
+<head>  
+    <meta charset="UTF-8">  
+    <title>聊天室</title>
+    <style>
+        *{
+            margin:0;
+            padding:0;
+            box-sizing: border-box;
+            -webkit-box-sizing: border-box;
+            -moz-box-sizing: border-box;
+        }
+        .container{
+            position: absolute;
+            top:0;
+            left:0;
+            right:0;
+            bottom:0;
+            background-color: grey;
+            padding: 50px;
+        }
+        .container .title{
+            width:300px;
+            margin: 0 auto;
+            font-size: 30px;
+            font-family: 'Franklin Gothic Medium';
+            font-weight: bold;
+            text-align: center;
+            margin-bottom:50px;
+        }
+        .container .login-wrap{
+            width:400px;
+            padding: 20px;
+            border: 1px solid #000;
+            margin: 0 auto;
+            text-align: center;
+        }
+        .login-wrap .user-ipt{
+            width:360px;
+            text-align: center;
+            vertical-align: middle;
+        }
+        .login-wrap .login-button{
+           width:60px;
+           height:24px;
+           line-height:20px;
+           font-size: 14px;
+           padding: 2px 0;
+           border-radius: 5px;
+           margin-top:10px;
+        }
+    </style>   
+</head>  
+<body>  
+    <div class="container">
+        <div class="title">欢迎来到ddvdd聊天室</div>
+        <div class="login-wrap">
+            <div class="user-ipt">
+                <span class="user-name">用户名：</span>
+                <input class="name-ipt" type="text" />
+            </div>
+            <button class="login-button">登陆</button>
+        </div>
+    </div>
+</body>  
+</html>  
