@@ -3,6 +3,9 @@
 <head>  
     <meta charset="UTF-8">  
     <title>聊天室</title>
+    <script src="js/jquery-3.2.1.min.js"></script>  
+    <script src="js/main.js"></script>  
+    <script src="/socket.io/socket.io.js"></script>  
     <style>
         *{
             margin:0;
@@ -17,17 +20,17 @@
             left:0;
             right:0;
             bottom:0;
-            background-color: grey;
+            background-color: darkgrey;
             padding: 50px;
+            overflow-y: scroll;
         }
         .container .title{
-            width:300px;
             margin: 0 auto;
             font-size: 30px;
             font-family: 'Franklin Gothic Medium';
             font-weight: bold;
             text-align: center;
-            margin-bottom:50px;
+            margin-bottom:20px;
         }
         .container .login-wrap{
             width:400px;
@@ -50,17 +53,63 @@
            border-radius: 5px;
            margin-top:10px;
         }
+        .chat-wrap .chat-content{
+            width:100%;
+            height:600px;
+            background-color: whitesmoke;
+            padding:10px;
+        }
+        .chat-wrap .send-wrap{
+            margin-top: 20px;
+        }
+        .message-ipt{
+            width: 200px;
+            height: 100px;
+            padding: 0 5px;
+            vertical-align: bottom;
+        }
+        .chat-content p{
+            display: block;
+            margin-bottom: 10px;
+        }
+        .chat-content p .msg{
+            display: inline-block;
+            padding: 8px 11px;
+            border-radius:6px;
+        }
+        .chat-content .self-message .msg{
+            background-color:#d0e7ff;
+            border: 1px solid #c9dfff;
+        }
+        .chat-content .other-message .msg{
+            background-color:white;
+            border: 1px solid #eee;
+        }
+        .chat-content .self-message{
+            text-align:right;
+        }
+        .chat-content .other-message{
+            text-align-last:left;
+        }
     </style>   
 </head>  
 <body>  
     <div class="container">
-        <div class="title">欢迎来到ddvdd聊天室</div>
-        <div class="login-wrap">
+        <div id="loginbox" class="login-wrap">
+            <div class="title">登录</div>
             <div class="user-ipt">
                 <span class="user-name">用户名：</span>
-                <input class="name-ipt" type="text" />
+                <input id="name" class="name-ipt" type="text" />
             </div>
-            <button class="login-button">登陆</button>
+            <button id="loginbutton" class="login-button">登录</button>
+        </div>
+        <div id="chatbox" class="chat-wrap" style="display:none">
+            <div id="content" class="chat-content">
+                <!-- 聊天内容 -->
+            </div>
+            <div class="send-wrap">
+                <textarea rows="3" cols="20" id="chatmessage" class="message-ipt" type="textarea" placeholder="请输入要发送的信息内容"></textarea>
+            </div>
         </div>
     </div>
 </body>  
