@@ -1,14 +1,13 @@
-手把手教你用nodejs+express搭建一个简易的多人聊天室
-
 前言
---
+==
 本文主要是笔者在学习node的时候，作为练手的一个小项目，花了几天空余时间，边码边写教程的一个过程。适用于对node理论知识看的多，实战少的同学，那么现在就让我们开始吧！（临近过年，手上story大多已经完成，今天下午就开始写点吧 ——码于2018-02-07 15:21）
 
 准备工作
---
+==
 1. 新建一个文件夹 chatroom
 2. 在终端输入以下命令，按照步骤npm（没装过的去官网安装下node和npm）会自动给你生成一个package.json文件
-    npm init
+3. 安装express和socket.io 
+package.json文件如下：
     //package.json
     {
         "name": "chatroom",
@@ -34,10 +33,10 @@
         },
         "homepage": "https://github.com/ddvdd008/chatroom#readme"
     }
-3.  安装express和socket.io 
+安装express和socket.io 
     npm install express --save  
     npm install socket.io --save 
-    //package.json自动新增依赖
+package.json自动新增依赖
     "dependencies": {
         "express": "^4.16.2",
         "socket.io": "^2.0.4"
@@ -47,7 +46,7 @@
 到这里准备工作进行的差不多了，下面我们开始一步步实现。
 
 搭建web服务器
---
+==
 ##express创建服务
 学过node同学应该不陌生，利用http.createServer就能简单的创建一个服务器，这次我们利用express来创建服务。在项目根目录创建一个app.js。
     /**
@@ -129,7 +128,8 @@ io.on表示监听某个事件，该事件一发生，就触发回调函数。’
 现在访问http://127.0.0.1:3000/static/chat.html:
 ![](https://github.com/ddvdd008/chatroom/raw/master/Logo/1517991905275.jpg)
 哎？啥也没有。。。那不废话！我们都没url请求对应的静态资源！
-##添加静态html
+添加静态html
+==
 我们在项目根目录创建public文件夹，public文件夹里面新建chat.html文件：
     <!DOCTYPE html>  
     <html lang="en">  
@@ -145,7 +145,7 @@ io.on表示监听某个事件，该事件一发生，就触发回调函数。’
 ![](https://github.com/ddvdd008/chatroom/raw/master/Logo/1517992230366.jpg)
 到这里其实一个最简单的浏览器和web服务器协作的项目就已经完成，后面我们要不断完善页面，给服务器后端加业务功能来实现多人聊天室。
 基本功能实现
---
+==
 1. 登陆功能，我们需要一个用户名，（不需要密码），该用户名必须客户端服务器都有存储。每次传输信息基本都需要包括用户名，否则不知道是谁发的。
 2. 群聊功能，我们需要分辨信息来己方和对方
 ##登陆功能实现
@@ -571,5 +571,5 @@ io.on表示监听某个事件，该事件一发生，就触发回调函数。’
 ![](https://github.com/ddvdd008/chatroom/raw/master/Logo/1518336042785.jpg)
 
 总结
---
+==
 [github地址](https://github.com/ddvdd008/chatroom)
