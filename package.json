@@ -23,6 +23,7 @@
   "homepage": "https://github.com/ddvdd008/chatroom#readme",
   "dependencies": {
     "express": "^4.16.2",
+    "mongodb": "^3.0.2",
     "socket.io": "^2.0.4"
   }
 }

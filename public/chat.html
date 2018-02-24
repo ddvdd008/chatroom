@@ -44,6 +44,14 @@
             text-align: center;
             vertical-align: middle;
         }
+        .user-ipt .ipt-wrap{
+            margin-bottom:10px;
+        }
+        .user-ipt .text-ipt{
+            display: inline-block;
+            width:64px;
+            text-align: right;
+        }
         .login-wrap .login-button{
            width:60px;
            height:24px;
@@ -51,7 +59,7 @@
            font-size: 14px;
            padding: 2px 0;
            border-radius: 5px;
-           margin-top:10px;
+           border:0;
         }
         .chat-wrap .chat-content{
             width:100%;
@@ -98,8 +106,14 @@
         <div id="loginbox" class="login-wrap">
             <div class="title">登录</div>
             <div class="user-ipt">
-                <span class="user-name">用户名：</span>
-                <input id="name" class="name-ipt" type="text" />
+                <div class="ipt-wrap">
+                    <span class="text-ipt">用户名：</span>
+                    <input id="name" class="name-ipt" type="text" />
+                </div>
+                <div class="ipt-wrap">
+                    <span class="text-ipt">密码：</span>
+                    <input id="password" class="password-ipt" type="password" />
+                </div>
             </div>
             <button id="loginbutton" class="login-button">登录</button>
         </div>

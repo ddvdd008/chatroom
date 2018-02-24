@@ -4,7 +4,9 @@
 $(function(){
     const url = 'http://127.0.0.1:3000';
     let _username = '';
+    let _password = '';
     let _$inputname = $('#name');
+    let _$inputpassword = $('#password');
     let _$loginButton = $('#loginbutton');
     let _$chattextarea = $('#chatmessage');
 
@@ -14,13 +16,16 @@ $(function(){
     let setUsername = () => {
         
         _username = _$inputname.val().trim();    //得到输入框中用户输入的用户名
-
-        //判断用户名是否存在
-        if(_username) {
-            socket.emit('login',{username: _username});   //如果用户名存在，就代表可以登录了，我们就触发登录事件，就相当于告诉服务器我们要登录了
+        _password = _$inputpassword.val();  //得到输入框中用户输入的密码
+        //判断用户名或者密码是否为空
+        if(_username && _password) {
+            socket.emit('login',{
+                username: _username,
+                password: _password
+            });   //把用户名和密码传给服务端，就相当于告诉服务器我们要登录了
         }
         else{
-            alert('请输入用户名！');
+            alert('请输入用户名或者密码！');
         }
     };
 
@@ -83,7 +88,17 @@ $(function(){
             showChatRoom();       //登录成功，显示聊天室  
         }
         else if(data.code ===1){  
-            alert('用户已登录！');  
+            alert('密码错误');  
+        }
+        else if(data.code ==='2-0'){
+            alert('注册成功');
+            showChatRoom();       //登录成功，显示聊天室  
+        }
+        else if(data.code ==='2-1'){
+            alert('注册失败');
+        }
+        else if(data.code ===3){  
+            alert('该用户已经登录');  
         }
         else{
             alert('登录失败！');

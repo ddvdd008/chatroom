@@ -599,6 +599,357 @@ io.on表示监听某个事件，该事件一发生，就触发回调函数。’
 ![](https://github.com/ddvdd008/chatroom/raw/master/Logo/1518335901114.jpg)
 ![](https://github.com/ddvdd008/chatroom/raw/master/Logo/1518335985326.jpg)
 ![](https://github.com/ddvdd008/chatroom/raw/master/Logo/1518336042785.jpg)
+# 引入mongodb数据库
+现在登录的用户名没有持久性，一旦服务关闭，就会消失，现在引入数据库，把用户第一次注册的信息存入数据库下次登录只需要输入用户名密码即可登录不需要再注册。
+## 下载mongodb
+[下载地址](https://www.mongodb.com/download-center#atlas)
+或者用[Homebrew](https://brew.sh/)
+我这边采取Homebrew安装,安装前更新下brew:
+```
+    brew update
+```
+```
+    brew install mongodb
+```
+```
+    cd /usr/local/bin
+```
+一大堆mongod，表示安装成功
+## mongodb配置
+在/usr/local/下，新建文件夹mongodb，在mongodb下新建data和log文件夹 
+```
+    cd /usr/local/mongodb
+    mkdir data //存放建立的数据库数据
+    mkdir log  //日志文件
+```
+在/usr/local/bin下，创建mongodb.conf配置文件
+```
+    vim mongodb.conf  
+```
+```
+    port=27017  
+    dbpath=/usr/local/mongodb/data/  
+    logpath=/usr/local/mongodb/log/mongodb.log    
+    fork = true
+```
+port: 数据库服务使用端口
+dbpath: 数据存放的文件位置
+logpath: 日志文件的存放位置
+fork: 后台守护进程运行
+在bin路径下，执行启动数据库服务
+```
+    ./mongod -f mongodb.conf
+```
+关闭数据库服务，在bin下执行 ps：数据库服务不能随意关闭，一定要遵循[特定命令](https://docs.mongodb.com/manual/tutorial/manage-mongodb-processes/)才行
+```
+    ./mongo
+    use admin
+    db.shutdownServer()
+```
+## 创建自己的数据库
+```
+    > use DATABASE_CHATROOM
+    switched to db DATABASE_CHATROOM
+    > db
+    DATABASE_CHATROOM
+    > 
+```
+如果你想查看所有数据库，可以使用 show dbs 命令：
+```
+    > show dbs
+    admin   0.000GB
+    local   0.000GB
+    > 
+```
+可以看到，我们刚创建的数据库 DATABASE_CHATROOM并不在数据库的列表中，要显示它，我们需要向 DATABASE_CHATROOM 数据库插入一些数据。
+好了现在我们的数据库已经创建完成，下面我们来看下如何创建表：
+```
+    > db.createCollection("userlist")
+    { "ok" : 1 }
+    > show collections
+    userlist
+```
+## nodejs连接mongodb
+nodejs服务要连接mongoDB数据库，我们需要先安装mongodb:
+```
+    npm install mongodb --save
+```
+要在 MongoDB 中创建一个数据库，首先我们需要创建一个 MongoClient 对象，然后配置好指定的 URL 和 端口号。
+如果数据库不存在，MongoDB 将创建数据库并建立连接。app.js引入mongodb模块：
+```
+    const MongoClient = require('mongodb').MongoClient;
+    const url = "mongodb://localhost:27017/DATABASE_CHATROOM";
+
+    //连接数据库
+    MongoClient.connect(url, function(err, db) {
+        if (err) throw err;
+        console.log("数据库已创建!");
+        db.close();
+    });
+```
+重启app.js，如果看到"数据库已创建!"这句话，说明你连接数据库已经成功！
+## 服务端用户登录存储逻辑改造
+之前服务端会把客户端传过来的用户名保存在服务端启动创建的全局变量数组里，这样是不具备持久性的，一旦服务器关闭，用户信息就消失了。
+之前app.js处理用户方法：
+```
+    //将该用户的信息存进数组中  
+    users.push({  
+        username: data.username,  
+        message: []  
+    }); 
+```
+现在我们有了数据库DATABASE_CHATROOM，我们可以把用户信息存入数据库userlist表中，这样即使服务器关闭了，用户信息也不会丢失。
+往数据库DATABASE_CHATROOM中的userlist表中插入用户数据：
+```
+    MongoClient.connect(url, function(err, db) {
+        if (err) throw err;
+        const dbo = db.db("DATABASE_CHATROOM");
+        const myobj = { username: "ddvdd", password: "123132" };
+        dbo.collection("userlist").insertOne(myobj, function(err, res) {
+            if (err) throw err;
+            console.log("注册成功");
+            db.close();
+        });
+    });
+```
+查询数据库当中某个用户名是否存在：
+```
+    MongoClient.connect(url, function(err, db) {
+        if (err) throw err;
+        const dbo = db.db("DATABASE_CHATROOM");
+        dbo.collection("userlist").find({username:'ddvdd'}).toArray(function(err, result) {
+            if (err) throw err;
+            db.close();
+        });
+    });
+```
+还有一点要注意的是，数据库连接、查询、添加等操作都是异步操作，我们为了编程方便，我这边采用promise封装了下，具体改造代码如下：
+``` //app.js 改造
+
+    /**
+    * Created by ddvdd on 2018-02-07.
+    */
+    const express = require('express');  
+    const app = express();               // 创建express实例，赋值给app。
+    const server = require('http').Server(app);  
+    const io = require('socket.io')(server);     //将socket的监听加到app设置的模块里。这两句理解不了的可以去socket.io官网去看
+    const path = require('path');        // 这是node的路径处理模块，可以格式化路径
+
+    const MongoClient = require('mongodb').MongoClient; //创建一个 MongoClient 对象，然后配置好指定的 URL 和 端口号
+    const url = "mongodb://localhost:27017/DATEBASE_CHATROOM";
+    
+    const onlineUsers = [];              //当前在线人员
+    let usersNum = 0;                    //统计在线登录人数
+
+    server.listen(3000,()=>{                
+        console.log("server running at 127.0.0.1:3000");       // 代表监听3000端口，然后执行回调函数在控制台输出。  
+    });  
+
+
+    /**
+    * app.get(): express中的一个中间件，用于匹配get请求，说的简单点就是node处理请求的路由，对于不同url请求，让对应的不同app.get()去处理
+    * '/': 它匹配get请求的根路由 '/'也就是 127.0.0.1:3000/就匹配到它了
+    * req带表浏览器的请求对象，res代表服务器的返回对象
+    */
+    app.get('/',(req,res)=>{
+        res.redirect('/static/chat.html');      // express的重定向函数。如果浏览器请求了根路由'/',浏览器就给他重定向到 '127.0.0.1:3000/chat.html'路由中
+    });
+
+    /** 
+    * __dirname表示当前文件所在的绝对路径，所以我们使用path.join将app.js的绝对路径和public加起来就得到了public的绝对路径。 
+    * 用path.join是为了避免出现 ././public 这种奇怪的路径 
+    * express.static就帮我们托管了public文件夹中的静态资源。 
+    * 只要有 127.0.0.1：3000/XXX/AAA 的路径都会去public文件夹下找XXX文件夹下的AAA文件然后发送给浏览器。 
+    */  
+    app.use('/static',express.static(path.join(__dirname,'./public')));        //一句话就搞定。  
+
+
+    /*socket*/  
+    io.on('connection',(socket)=>{              //监听客户端的连接事件  
+        
+        socket.on('login',(data)=>{  
+            checkUser(data,socket);
+        });  
+        /** 
+        * 监听sendMessage,我们得到客户端传过来的data里的message，并存起来。 
+        */  
+        socket.on('sendMessage',(data)=>{  
+            for(let _user of onlineUsers) {  
+                if(_user.username === data.username) {  
+                    _user.message.push(data.message);  
+                    //信息存储之后触发receiveMessage将信息发给所有浏览器-广播事件  
+                    io.emit('receiveMessage',data);  
+                    break;  
+                }  
+            }  
+        });  
+        //断开连接后做的事情  
+        socket.on('disconnect',()=>{          //注意，该事件不需要自定义触发器，系统会自动调用  
+            usersNum = onlineUsers.length; 
+            console.log(`当前在线登录人数：${usersNum}`);  
+        });  
+    });  
+    //添加在线人数
+    const addOnlineUser = (data) => {
+        onlineUsers.push({  
+            username: data.username,  
+            message: []  
+        });
+        usersNum = onlineUsers.length;
+        console.log(`用户${data.username}登录成功，进入ddvdd聊天室，当前在线登录人数：${usersNum}`);  
+    }
+    //数据库操作为异步操作，利用promise简单封装下。
+    //异步封装数据库连接，并且打开集合userlist
+    const connectDB = () => {
+        return new Promise((resolve,reject) => {
+            MongoClient.connect(url, function(err, db) {
+                if (err) {
+                    reject(err);  
+                }
+                const dbo = db.db("DATABASE_CHATROOM");
+                const collection = dbo.collection("userlist");
+                resolve({
+                    db:db,
+                    collection:collection
+                });
+            });
+        });
+    }
+    //异步封装检测用户名是否已经注册
+    const isRegister = (dbObj,name) => {
+        return new Promise((resolve,reject) => {
+            dbObj.collection.find({username:name}).toArray(function(err, result) {
+                if (err) {
+                    reject(err);  
+                }
+                resolve(Object.assign(dbObj,{result:result}));
+            });
+        });
+    }
+    //异步封装注册新增用户
+    const addUser = (dbObj,userData) => {
+        return new Promise((resolve,reject) => {
+            const myobj = userData;
+            dbObj.collection.insertOne(myobj, function(err, res) {
+                if (err) {
+                    reject(err);  
+                }
+                resolve(Object.assign(dbObj,res));
+                dbObj.db.close();
+            });
+        });
+    }
+
+    //校验逻辑：
+    //1.用户是否已经登录 已经登录返回code=3
+    const isLogin = (data) => {
+        let flag = false;
+        onlineUsers.map((user) => {
+            if(user.username === data.username){
+                flag = true;
+            }
+        });
+        return flag;
+    }
+    //2.用户是否已经注册，如果已经注册，校验密码是否正确，密码正确返回code=0，密码错误返回code=1，未注册返回code=2，
+    const checkUser = (data,socket) => {
+        connectDB().then(dbObj => {
+            return isRegister(dbObj,data.username);
+        }).then(dbObj => {
+            const userData = dbObj.result || [];
+            if(userData.length > 0){
+                if(userData[0].password === data.password){
+                    if(isLogin(data)){
+                        socket.emit('loginResult',{code:3});
+                    }
+                    else{
+                        addOnlineUser(data);
+                        socket.emit('loginResult',{code:0});
+                    }
+                }
+                else{
+                    socket.emit('loginResult',{code:1});
+                }
+                dbObj.db.close();
+            }
+            else{
+                addUser(dbObj,data).then(resolve => {
+                    addOnlineUser(data);
+                    socket.emit('loginResult',{code:'2-0'});
+                },reject => {
+                    socket.emit('loginResult',{code:'2-1'});
+                });
+            }
+            
+        });
+    }
+```
+```
+    //main.js 改造
+
+    let _username = '';
+    let _password = '';
+    let _$inputname = $('#name');
+    let _$inputpassword = $('#password');
+    let _$loginButton = $('#loginbutton');
+    let _$chattextarea = $('#chatmessage');
+
+    let socket = io.connect(url);
+
+    //设置用户名，当用户登录的时候触发
+    let setUsername = () => {
+        
+        _username = _$inputname.val().trim();    //得到输入框中用户输入的用户名
+        _password = _$inputpassword.val();  //得到输入框中用户输入的密码
+        //判断用户名或者密码是否为空
+        if(_username && _password) {
+            socket.emit('login',{
+                username: _username,
+                password: _password
+            });   //把用户名和密码传给服务端，就相当于告诉服务器我们要登录了
+        }
+        else{
+            alert('请输入用户名或者密码！');
+        }
+    };
+    ...
+    ...
+    ...
+    /*socket.io部分逻辑*/  
+    socket.on('loginResult',(data)=>{  
+        /** 
+         * 如果服务器返回的用户名和刚刚发送的相同的话，就登录 
+         * 否则说明有地方出问题了，拒绝登录 
+         */  
+        if(data.code === 0) {  
+            showChatRoom();       //登录成功，显示聊天室  
+        }
+        else if(data.code ===1){  
+            alert('密码错误');  
+        }
+        else if(data.code ==='2-0'){
+            alert('注册成功');
+            showChatRoom();       //登录成功，显示聊天室  
+        }
+        else if(data.code ==='2-1'){
+            alert('注册失败');
+        }
+        else if(data.code ===3){  
+            alert('该用户已经登录');  
+        }
+        else{
+            alert('登录失败！');
+        }
+    })  
+```
+app.js改造点：
+1. 主要是把客户端传过来的用户名密码进行数据库比较
+2. 如果存在用户名，就比较密码是否一致
+3. 如果密码一致，判断是否已经登录
+4. 如果不存在用户名就拿用户名和密码进行注册和登录
+其他改造点：
+1. 登录页面新增密码输入
+2. main.js页面引入密码获取，根据服务器返回不同的code，做不同提示
 
 # 总结
 [github地址](https://github.com/ddvdd008/chatroom)

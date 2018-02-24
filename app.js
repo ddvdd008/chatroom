@@ -1,4 +1,3 @@
-
 /**
  * Created by ddvdd on 2018-02-07.
  */
@@ -8,7 +7,10 @@ const server = require('http').Server(app);
 const io = require('socket.io')(server);     //将socket的监听加到app设置的模块里。这两句理解不了的可以去socket.io官网去看
 const path = require('path');        // 这是node的路径处理模块，可以格式化路径
 
-const users = [];                    //用来保存所有的用户信息  
+const MongoClient = require('mongodb').MongoClient; //创建一个 MongoClient 对象，然后配置好指定的 URL 和 端口号
+const url = "mongodb://localhost:27017/DATEBASE_CHATROOM";
+ 
+const onlineUsers = [];              //当前在线人员
 let usersNum = 0;                    //统计在线登录人数
 
 server.listen(3000,()=>{                
@@ -33,31 +35,18 @@ app.get('/',(req,res)=>{
  */  
 app.use('/static',express.static(path.join(__dirname,'./public')));        //一句话就搞定。  
 
+
 /*socket*/  
 io.on('connection',(socket)=>{              //监听客户端的连接事件  
       
     socket.on('login',(data)=>{  
-
-        if(checkUserName(data)){
-            socket.emit('loginResult',{code:1});   //code=1 用户已登录 
-        }
-        else{
-            //将该用户的信息存进数组中  
-            users.push({  
-                username: data.username,  
-                message: []  
-            }); 
-            socket.emit('loginResult',{code:0});   //code=0 用户登录成功
-            usersNum = users.length;  
-            console.log(`用户${data.username}登录成功，进入ddvdd聊天室，当前在线登录人数：${usersNum}`);  
-        }
-          
+        checkUser(data,socket);
     });  
     /** 
      * 监听sendMessage,我们得到客户端传过来的data里的message，并存起来。 
      */  
     socket.on('sendMessage',(data)=>{  
-        for(let _user of users) {  
+        for(let _user of onlineUsers) {  
             if(_user.username === data.username) {  
                 _user.message.push(data.message);  
                 //信息存储之后触发receiveMessage将信息发给所有浏览器-广播事件  
@@ -68,17 +57,101 @@ io.on('connection',(socket)=>{              //监听客户端的连接事件
     });  
     //断开连接后做的事情  
     socket.on('disconnect',()=>{          //注意，该事件不需要自定义触发器，系统会自动调用  
-        usersNum = users.length; 
+        usersNum = onlineUsers.length; 
         console.log(`当前在线登录人数：${usersNum}`);  
     });  
 });  
-//校验用户是否已经登录
-const checkUserName = (data) => {
-    let isExist = false;
-    users.map((user) => {
+//添加在线人数
+const addOnlineUser = (data) => {
+    onlineUsers.push({  
+        username: data.username,  
+        message: []  
+    });
+    usersNum = onlineUsers.length;
+    console.log(`用户${data.username}登录成功，进入ddvdd聊天室，当前在线登录人数：${usersNum}`);  
+}
+//数据库操作为异步操作，利用promise简单封装下。
+//异步封装数据库连接，并且打开集合userlist
+const connectDB = () => {
+    return new Promise((resolve,reject) => {
+        MongoClient.connect(url, function(err, db) {
+            if (err) {
+                reject(err);  
+            }
+            const dbo = db.db("DATABASE_CHATROOM");
+            const collection = dbo.collection("userlist");
+            resolve({
+                db:db,
+                collection:collection
+            });
+        });
+    });
+}
+//异步封装检测用户名是否已经注册
+const isRegister = (dbObj,name) => {
+    return new Promise((resolve,reject) => {
+        dbObj.collection.find({username:name}).toArray(function(err, result) {
+            if (err) {
+                reject(err);  
+            }
+            resolve(Object.assign(dbObj,{result:result}));
+        });
+    });
+}
+//异步封装注册新增用户
+const addUser = (dbObj,userData) => {
+    return new Promise((resolve,reject) => {
+        const myobj = userData;
+        dbObj.collection.insertOne(myobj, function(err, res) {
+            if (err) {
+                reject(err);  
+            }
+            resolve(Object.assign(dbObj,res));
+            dbObj.db.close();
+        });
+    });
+}
+
+//校验逻辑：
+//1.用户是否已经登录 已经登录返回code=3
+const isLogin = (data) => {
+    let flag = false;
+    onlineUsers.map((user) => {
         if(user.username === data.username){
-            isExist = true;
+            flag = true;
         }
     });
-    return isExist;
+    return flag;
+}
+//2.用户是否已经注册，如果已经注册，校验密码是否正确，密码正确返回code=0，密码错误返回code=1，未注册返回code=2，
+const checkUser = (data,socket) => {
+    connectDB().then(dbObj => {
+        return isRegister(dbObj,data.username);
+    }).then(dbObj => {
+        const userData = dbObj.result || [];
+        if(userData.length > 0){
+            if(userData[0].password === data.password){
+                if(isLogin(data)){
+                    socket.emit('loginResult',{code:3});
+                }
+                else{
+                    addOnlineUser(data);
+                    socket.emit('loginResult',{code:0});
+                }
+            }
+            else{
+                socket.emit('loginResult',{code:1});
+            }
+            dbObj.db.close();
+        }
+        else{
+            addUser(dbObj,data).then(resolve => {
+                addOnlineUser(data);
+                socket.emit('loginResult',{code:'2-0'});
+            },reject => {
+                socket.emit('loginResult',{code:'2-1'});
+            });
+        }
+        
+    });
 }
